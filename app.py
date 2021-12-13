@@ -3,6 +3,9 @@ from flask import Flask #, jsonify
 from datetime import datetime
 from flask.wrappers import Response
 #from redisearch import Client, TextField, NumericField, Query
+from redisearch import Client
+import sys
+
 
 import json, redis
 
@@ -51,6 +54,7 @@ def insert():
 def getAll():
     print('Inside Get all Function', datetime.today())
     try:
+        
         map=connection.hgetall('user:1')
         #print(map)
         #print(map['first_name']) 
@@ -63,10 +67,11 @@ def getAll():
     
 @app.route('/search', methods=['GET'])
 def search():
-    #client = Client('users')
-    #res = client.search("Beef")
-    #print(res)
-    raise Exception('Exception Check')
+    #print(sys.path)
+    client = Client('users')
+    res = client.search("Ela*")
+    print(res)
+    #raise Exception('Exception Check')
     return 'OK'
 
 
