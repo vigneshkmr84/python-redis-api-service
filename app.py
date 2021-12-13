@@ -5,14 +5,10 @@ from flask.wrappers import Response
 from types import SimpleNamespace
 from collections import namedtuple
 
-#from redisearch import Client, TextField, NumericField, Query
-from redisearch import Client
-import sys
-
-
+from redisearch import Client, TextField, NumericField, Query
+#from redisearch import Client
 import json, redis
 
-#import redis
 
 NOT_AVAILABLE = 'API Not found'
 SERVER_ERROR = 'Internal Server Error'
@@ -43,46 +39,39 @@ sample_user =   { "id": 1, "first_name": "Elaine", "last_name": "Dallosso", "ema
 @app.route('/insert', methods=["GET"])
 def insert():
     try:
-        #connection.mset({"car:0": "toyoto", "car:1": "BMW"})
         #connection.hmset('user:1', {'data': json.dumps(payload) });
         connection.hmset('user:1', sample_user)
-        #.decode('utf-8')
-        #print(map['product'])
-        #map = json.loads(payload);
-        #print(map['name'], map['age']);
         return Response('Inserted Successfully', status=201, mimetype='application/json')
     except:
         print('Exception Occurred during Insert')        
         return Response(SERVER_ERROR, status=500, mimetype='application/json')
     
+    # implement service name as the api input
+    # also add the hset insert to the respective 2nd key  
 @app.route('/post', methods=['POST'])    
 def post():
-    #content_type = request.headers.get('Content-Type')
-    #if (content_type == 'application/json'):
     rawRequst = request.json
-    print(rawRequst)
+    id = rawRequst['id']
     requestBody = json.dumps(rawRequst)
-        
-        #print(jsonData)    
-
+    
     #jsonData = json.loads(requestBody,object_hook=lambda d : namedtuple('X', d.keys()) (*d.values()))
+    #print(jsonData.firstName)
+    #print(jsonData.lastName)
+
     try:
-        connection.hmset('test_user:1', rawRequst)
-        #print(jsonData.firstName)
-        #print(jsonData.lastName)
+        key='test_user:' + str(id)    
+        connection.hmset(key, rawRequst)
         return Response('Inserted Successfully', status=201, mimetype='application/json')
     except redis.RedisError:
         print('Exception occured')
         return Response(SERVER_ERROR, status=500, mimetype='application/json')
-    return 'OK'
 
 
 @app.route('/get/all', methods=['GET'])
 def getAll():
     print('Inside Get all Function', datetime.today())
     try:
-        
-        map=connection.hgetall('user:3')
+        map=connection.hgetall('user:*')
         #print(map)
         #print(map['first_name']) 
         #print(json.loads(json.dumps(map)))
