@@ -12,7 +12,11 @@ import json, redis
 
 NOT_AVAILABLE = 'API Not found'
 SERVER_ERROR = 'Internal Server Error'
+INVALID_ARGUMENTS = 'Invalid Arguments Passed'
 
+
+USER_KEY_PREFIX = 'user:'
+TOTAL_KEYS = 'total'
 
 # Establishing Redis Connection 
 connection = redis.Redis(host='localhost'
@@ -23,31 +27,46 @@ connection = redis.Redis(host='localhost'
 
 
 app = Flask(__name__)
-jsonElements = ['first_name', 'last_name', 'email', 'product', 'address', 'phone_number', 'count', 'cost', 'currency']
+#jsonElements = ['first_name', 'last_name', 'email', 'product', 'address', 'phone_number', 'count', 'cost', 'currency']
 
-payload = {
-            "name":"tom",
-            "age": 23,
-            "mobile": "444-123-4567"
-          }
-
-sample_user =   { "id": 1, "first_name": "Elaine", "last_name": "Dallosso", "email": "edallosso0@networkadvertising.org",
-   "product": "Soup Campbells Beef With Veg", "address": "575 Portage Hill",
-   "phone_number": "659-993-4818", "count": 17, "cost": 21.38, "currency": "USD" }
-
-
-@app.route('/insert', methods=["GET"])
+@app.route('/insert', methods=['POST'])
 def insert():
+    rawRequst = request.json
+    id = rawRequst['id']
+    status=""
+    service_name=""
     try:
-        #connection.hmset('user:1', {'data': json.dumps(payload) });
-        connection.hmset('user:1', sample_user)
+        status = request.args.get('status')
+        service_name = request.args.get('serviceName')
+        #print(service_name)
+        #print(status)
+    except ValueError:
+        print(INVALID_ARGUMENTS)
+        return Response(INVALID_ARGUMENTS, status=400, mimetype='application/json')
+            
+    #requestBody = json.dumps(rawRequst)
+
+    try:
+        # inserting raw data into the hash set
+        key=USER_KEY_PREFIX + str(id)    
+        connection.hmset(key, rawRequst)
+        
+        # maintain status of each id per service level (success:s1 /  failure:s1, success:s2 / failure:s2 etc. ) 
+        service_status_key=status + ":" + service_name        
+        connection.sadd(service_status_key, id)
+        
+        # maintain total SET of all incominng keys (irrespective of the service it comes from)
+        connection.sadd(TOTAL_KEYS, id)
+        
         return Response('Inserted Successfully', status=201, mimetype='application/json')
-    except:
-        print('Exception Occurred during Insert')        
+    except redis.RedisError:
+        print('Exception occured')
         return Response(SERVER_ERROR, status=500, mimetype='application/json')
     
-    # implement service name as the api input
-    # also add the hset insert to the respective 2nd key  
+
+    
+# implement service name as the api input
+# also add the hset insert to the respective 2nd key  
 @app.route('/post', methods=['POST'])    
 def post():
     rawRequst = request.json
