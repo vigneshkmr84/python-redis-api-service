@@ -1,5 +1,18 @@
 # Redis Cache Service
 
+### Run the app
+
+Set the environment variables
+``` bash 
+export FLASK_ENV=development
+export FLASK_APP=app.py
+``` 
+
+Run the app.py
+``` bash
+python3 -m flask run --port 5000
+```
+
 __Sample Input Data:__
 
 ``` json 

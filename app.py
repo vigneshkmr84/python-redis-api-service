@@ -1,7 +1,10 @@
 #from random import sample
-from flask import Flask #, jsonify
+from flask import Flask, request #, jsonify
 from datetime import datetime
 from flask.wrappers import Response
+from types import SimpleNamespace
+from collections import namedtuple
+
 #from redisearch import Client, TextField, NumericField, Query
 from redisearch import Client
 import sys
@@ -10,6 +13,9 @@ import sys
 import json, redis
 
 #import redis
+
+NOT_AVAILABLE = 'API Not found'
+SERVER_ERROR = 'Internal Server Error'
 
 
 # Establishing Redis Connection 
@@ -37,9 +43,9 @@ sample_user =   { "id": 1, "first_name": "Elaine", "last_name": "Dallosso", "ema
 @app.route('/insert', methods=["GET"])
 def insert():
     try:
-        connection.mset({"car:0": "toyoto", "car:1": "BMW"})
+        #connection.mset({"car:0": "toyoto", "car:1": "BMW"})
         #connection.hmset('user:1', {'data': json.dumps(payload) });
-        connection.hmset('user:1', sample_user);
+        connection.hmset('user:1', sample_user)
         #.decode('utf-8')
         #print(map['product'])
         #map = json.loads(payload);
@@ -47,15 +53,36 @@ def insert():
         return Response('Inserted Successfully', status=201, mimetype='application/json')
     except:
         print('Exception Occurred during Insert')        
-        return Response('Internal Server Error', status=500, mimetype='application/json')
+        return Response(SERVER_ERROR, status=500, mimetype='application/json')
     
-    
-@app.route("/get/all", methods=["GET"])
+@app.route('/post', methods=['POST'])    
+def post():
+    #content_type = request.headers.get('Content-Type')
+    #if (content_type == 'application/json'):
+    rawRequst = request.json
+    print(rawRequst)
+    requestBody = json.dumps(rawRequst)
+        
+        #print(jsonData)    
+
+    #jsonData = json.loads(requestBody,object_hook=lambda d : namedtuple('X', d.keys()) (*d.values()))
+    try:
+        connection.hmset('test_user:1', rawRequst)
+        #print(jsonData.firstName)
+        #print(jsonData.lastName)
+        return Response('Inserted Successfully', status=201, mimetype='application/json')
+    except redis.RedisError:
+        print('Exception occured')
+        return Response(SERVER_ERROR, status=500, mimetype='application/json')
+    return 'OK'
+
+
+@app.route('/get/all', methods=['GET'])
 def getAll():
     print('Inside Get all Function', datetime.today())
     try:
         
-        map=connection.hgetall('user:1')
+        map=connection.hgetall('user:3')
         #print(map)
         #print(map['first_name']) 
         #print(json.loads(json.dumps(map)))
@@ -63,37 +90,55 @@ def getAll():
         return Response(json.dumps(map), status=200, mimetype='application/json')
     except redis.RedisError:
         print('Exception occurred during retrieval')
-        return Response('Internal Server Error', status=500, mimetype='application/json')
+        return Response(SERVER_ERROR, status=500, mimetype='application/json')
     
 @app.route('/search', methods=['GET'])
 def search():
     #print(sys.path)
+    print(request.args['query'])
+    
     client = Client('users')
-    res = client.search("Ela*")
-    print(res)
+    res = client.search('Ela*')
+    #print(res)
     #raise Exception('Exception Check')
-    return 'OK'
+    print('Total elements in result - ', res.total)
+    jsonObject = []
+    for element in range(res.total):
+        #print(res.docs[element])
+        e = res.docs[element]
+        parser(e)
+        #print(str(res.docs[element]).replace('Document ',''))
+        #jsonvalues = json.dumps(str(res.docs[element]).replace('Document ','').replace('\'', '\"').replace('None', 'null'))
+        jsonObject[element]=json.dumps(str(res.docs[element]).replace('Document ','').replace('\'', '\"').replace('None', 'null'))
+    #return json.dumps(res)
+    #print(json.loads(jsonvalues))
+    return Response(json.loads(jsonObject), status=200, mimetype='application/json' )
 
-
+def parser(e):
+    print(e.first_name)
+    
+    return 0;
+    
 ## Health Check API
-@app.route("/health", methods=["GET"])
+@app.route('/health', methods=['GET'])
 def health():
     print('Health Check @ ',  datetime.today())
     return Response('OK', status=200)
 
 ##### Custom Error Handling #####
+
 @app.errorhandler(404)
 def page_not_found(e):
-    return Response('Page not Found', status=404, mimetype='application/json')
+    return Response(NOT_AVAILABLE, status=404, mimetype='application/json')
     
 @app.errorhandler(500)
 def page_not_found(e):
-    return Response('Custom Internal Server Error', status=500, mimetype='application/json')
+    return Response(SERVER_ERROR, status=500, mimetype='application/json')
 
 
 ## initiating the server
 if __name__ == '__main__':
-    print("Starting service default port")
-    app.run(host='0.0.0.0', debug=False)
-    #app.run(host='0.0.0.0') # default - with debugger (will not show the custom Error pages)
+    print('Starting service default port')
+    #app.run(host='0.0.0.0', debug=False)
+    app.run(host='0.0.0.0') # default - with debugger (will not show the custom Error pages)
     
