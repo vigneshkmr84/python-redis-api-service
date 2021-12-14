@@ -17,10 +17,11 @@ INVALID_ARGUMENTS = 'Invalid Arguments Passed'
 
 USER_KEY_PREFIX = 'user:'
 TOTAL_KEYS = 'total'
+SEARCH_INDEX = 'users'
 
 # Establishing Redis Connection 
 connection = redis.Redis(host='localhost'
-                         , charset='utf-8'
+                         , charset='utf=8'
                          , decode_responses=True
                          , port=6379
                          , db=0)
@@ -102,30 +103,32 @@ def getAll():
     
 @app.route('/search', methods=['GET'])
 def search():
-    #print(sys.path)
-    print(request.args['query'])
     
-    client = Client('users')
-    res = client.search('Ela*')
-    #print(res)
-    #raise Exception('Exception Check')
-    print('Total elements in result - ', res.total)
-    jsonObject = []
+    query=request.args.get('query')
+    print("Query = ", query)
+    client = Client(SEARCH_INDEX)
+    res = client.search(query)
+    print('Total elements in result = ', res.total)
+    jsonArray = []
+    
     for element in range(res.total):
-        #print(res.docs[element])
-        e = res.docs[element]
-        parser(e)
-        #print(str(res.docs[element]).replace('Document ',''))
-        #jsonvalues = json.dumps(str(res.docs[element]).replace('Document ','').replace('\'', '\"').replace('None', 'null'))
-        jsonObject[element]=json.dumps(str(res.docs[element]).replace('Document ','').replace('\'', '\"').replace('None', 'null'))
-    #return json.dumps(res)
-    #print(json.loads(jsonvalues))
-    return Response(json.loads(jsonObject), status=200, mimetype='application/json' )
+        e = res.docs[element]       
+        jsonArray.append(parser(e))
+        
+    # Final JSON Array 
+    #print(jsonArray)
+    returnObject = { 'response' : jsonArray }
+    #print(returnObject)
+    return Response(json.dumps(returnObject), status=200, mimetype='application/json' );
 
-def parser(e):
-    print(e.first_name)
-    
-    return 0;
+## Function to parse the redis document from search to json object
+def parser(doc):
+    document_string = str(doc)
+    json_string = document_string.replace('Document', '').replace('\'', '\"').replace('None', 'null')
+    jsondata = json.loads(json_string)
+
+    #print(jsondata)
+    return jsondata;
     
 ## Health Check API
 @app.route('/health', methods=['GET'])
@@ -148,5 +151,5 @@ def page_not_found(e):
 if __name__ == '__main__':
     print('Starting service default port')
     #app.run(host='0.0.0.0', debug=False)
-    app.run(host='0.0.0.0') # default - with debugger (will not show the custom Error pages)
+    app.run(host='0.0.0.0') # default = with debugger (will not show the custom Error pages)
     
