@@ -1,12 +1,12 @@
-#from random import sample
-from flask import Flask, request #, jsonify
+
+from flask import Flask, request
 from datetime import datetime
 from flask.wrappers import Response
 from types import SimpleNamespace
 from collections import namedtuple
 
 from redisearch import Client, TextField, NumericField, Query
-#from redisearch import Client
+
 import json, redis
 
 
@@ -14,12 +14,14 @@ NOT_AVAILABLE = 'API Not found'
 SERVER_ERROR = 'Internal Server Error'
 INVALID_ARGUMENTS = 'Invalid Arguments Passed'
 
-
+### KEY PREFIX
 USER_KEY_PREFIX = 'user:'
 TOTAL_KEYS = 'total'
 SEARCH_INDEX = 'users'
+SUCCESS_PREFIX='success:'
+FAILURE_PREFIX='error:'
 
-# Establishing Redis Connection 
+# Establishing Redis Connection (utf-8 is important else there will be a 'b' character representing it's a byte type)
 connection = redis.Redis(host='localhost'
                          , charset='utf=8'
                          , decode_responses=True
@@ -28,8 +30,8 @@ connection = redis.Redis(host='localhost'
 
 
 app = Flask(__name__)
-#jsonElements = ['first_name', 'last_name', 'email', 'product', 'address', 'phone_number', 'count', 'cost', 'currency']
 
+## This API is only for the first service to upsert the data
 @app.route('/insert', methods=['POST'])
 def insert():
     rawRequst = request.json
@@ -39,8 +41,7 @@ def insert():
     try:
         status = request.args.get('status')
         service_name = request.args.get('serviceName')
-        #print(service_name)
-        #print(status)
+    
     except ValueError:
         print(INVALID_ARGUMENTS)
         return Response(INVALID_ARGUMENTS, status=400, mimetype='application/json')
@@ -63,47 +64,67 @@ def insert():
     except redis.RedisError:
         print('Exception occured')
         return Response(SERVER_ERROR, status=500, mimetype='application/json')
-    
 
-    
-# implement service name as the api input
-# also add the hset insert to the respective 2nd key  
-@app.route('/post', methods=['POST'])    
-def post():
-    rawRequst = request.json
-    id = rawRequst['id']
-    requestBody = json.dumps(rawRequst)
-    
-    #jsonData = json.loads(requestBody,object_hook=lambda d : namedtuple('X', d.keys()) (*d.values()))
-    #print(jsonData.firstName)
-    #print(jsonData.lastName)
-
+## Updating the Status
+@app.route('/status', methods=['POST'])
+def statusUpdate():
     try:
-        key='test_user:' + str(id)    
-        connection.hmset(key, rawRequst)
-        return Response('Inserted Successfully', status=201, mimetype='application/json')
-    except redis.RedisError:
-        print('Exception occured')
+        #status=request.args.get('status')
+        #service_name=request.args.get('service')
+        #error=request.args.get('error')
+        rawRequst = request.json
+        
+        status=rawRequst['status']
+        id=rawRequst['id']
+        service_name=rawRequst['service']
+        error=rawRequst['error']
+        updateStatus(status, id, service_name, error)
+        return Response('Updated Successfully', status=200, mimetype='application/json')     
+    except ValueError:
+        print('Exception occurred during status update')
         return Response(SERVER_ERROR, status=500, mimetype='application/json')
+    
 
-
+def updateStatus(status, id, service_name, error):
+    
+    if status == 'success':
+        key= SUCCESS_PREFIX + service_name
+        connection.sadd(key, id)
+    else:
+        key=FAILURE_PREFIX + service_name
+        print('Updating Failure records for key : ' + key)
+        connection.sadd(key, id)
+        key=key +':' + str(id)
+        print('Recording Error message for key : ' + key)
+        connection.set(key, error)
+        
+    
+# API will find the set of total users in the list, and will iterate through them to fetch the data for each one.
 @app.route('/get/all', methods=['GET'])
 def getAll():
     print('Inside Get all Function', datetime.today())
+    jsonArray = []
     try:
-        map=connection.hgetall('user:*')
-        #print(map)
-        #print(map['first_name']) 
-        #print(json.loads(json.dumps(map)))
-        #print(json.dumps(map))
-        return Response(json.dumps(map), status=200, mimetype='application/json')
+        #map=connection.hgetall('user:*')
+        userSet = connection.smembers(TOTAL_KEYS)
+        for key in connection.scan_iter("user:*", 5):
+            # print the key
+            element = connection.hgetall(key)
+            #print(element)
+            jsonArray.append(element)
+        
+        print('Total result - ' + str(len(jsonArray)))
+        #returnObject = {'response': list(userSet)}
+        returnObject = {'response': jsonArray}
+        return Response(json.dumps(returnObject), status=200, mimetype='application/json')
     except redis.RedisError:
         print('Exception occurred during retrieval')
         return Response(SERVER_ERROR, status=500, mimetype='application/json')
+
+
     
 @app.route('/search', methods=['GET'])
 def search():
-    
     query=request.args.get('query')
     print("Query = ", query)
     client = Client(SEARCH_INDEX)
@@ -115,10 +136,9 @@ def search():
         e = res.docs[element]       
         jsonArray.append(parser(e))
         
-    # Final JSON Array 
-    #print(jsonArray)
+    # Final JSON Array print(jsonArray)
     returnObject = { 'response' : jsonArray }
-    #print(returnObject)
+    
     return Response(json.dumps(returnObject), status=200, mimetype='application/json' );
 
 ## Function to parse the redis document from search to json object
