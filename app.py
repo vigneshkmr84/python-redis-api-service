@@ -17,6 +17,7 @@ INVALID_ARGUMENTS = 'Invalid Arguments Passed'
 
 USER_KEY_PREFIX = 'user:'
 TOTAL_KEYS = 'total'
+SEARCH_INDEX = 'users'
 
 # Establishing Redis Connection 
 connection = redis.Redis(host='localhost'
@@ -102,64 +103,32 @@ def getAll():
     
 @app.route('/search', methods=['GET'])
 def search():
-    #print(sys.path)
+    
     query=request.args.get('query')
     print("Query = ", query)
-    
-    client = Client('users')
-    #res = client.search('Olimpia')
+    client = Client(SEARCH_INDEX)
     res = client.search(query)
-    #print("Response ")
-    #print(res)
-    #raise Exception('Exception Check')
     print('Total elements in result = ', res.total)
-    #print(type(res))
-    #print(res)
-    print("==============================================================================")
     jsonArray = []
     
     for element in range(res.total):
-        #print(res.docs[element])
-        e = res.docs[element]
-        #print(e)
-        print("------------------------------------------------------------------------------")
-        #print(e.id)
+        e = res.docs[element]       
+        jsonArray.append(parser(e))
         
-        document_string = str(e)
-        json_string = document_string.replace('Document', '').replace('\'', '\"').replace('None', 'null')
-        
-        #prints string in double quotes("")
-        #print(json_string)
-        jsondata = json.loads(json_string)
-        #print(jsondata.last_name)
-        
-        #print(type(e.id))
-        
-        print(jsondata)
-        
-        jsonArray.append(jsondata)
-        #parser(e)
-        #print(str(res.docs[element]).replace('Document ',''))
-        #jsonvalues = json.dumps(str(res.docs[element]).replace('Document ','').replace('\'', '\"').replace('None', 'null'))
-        
-        #jsonObject[element]=json.dumps(str(res.docs[element]).replace('Document ','').replace('\'', '\"').replace('None', 'null'))
-    #return json.dumps(res)
-    #print(json.loads(jsonvalues))
-    
-    
-    #return Response(json.loads(jsonObject), status=200, mimetype='application/json' )
-    
     # Final JSON Array 
     #print(jsonArray)
     returnObject = { 'response' : jsonArray }
-    print(returnObject)
-    returnObject = json.dumps(returnObject)
-    return Response(returnObject, status=200, mimetype='application/json' );
+    #print(returnObject)
+    return Response(json.dumps(returnObject), status=200, mimetype='application/json' );
 
-def parser(e):
-    print(e.first_name)
-    
-    return 0;
+## Function to parse the redis document from search to json object
+def parser(doc):
+    document_string = str(doc)
+    json_string = document_string.replace('Document', '').replace('\'', '\"').replace('None', 'null')
+    jsondata = json.loads(json_string)
+
+    #print(jsondata)
+    return jsondata;
     
 ## Health Check API
 @app.route('/health', methods=['GET'])
