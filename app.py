@@ -20,7 +20,7 @@ TOTAL_KEYS = 'total'
 
 # Establishing Redis Connection 
 connection = redis.Redis(host='localhost'
-                         , charset='utf-8'
+                         , charset='utf=8'
                          , decode_responses=True
                          , port=6379
                          , db=0)
@@ -103,24 +103,58 @@ def getAll():
 @app.route('/search', methods=['GET'])
 def search():
     #print(sys.path)
-    print(request.args['query'])
+    query=request.args.get('query')
+    print("Query = ", query)
     
     client = Client('users')
-    res = client.search('Ela*')
+    #res = client.search('Olimpia')
+    res = client.search(query)
+    #print("Response ")
     #print(res)
     #raise Exception('Exception Check')
-    print('Total elements in result - ', res.total)
-    jsonObject = []
+    print('Total elements in result = ', res.total)
+    #print(type(res))
+    #print(res)
+    print("==============================================================================")
+    jsonArray = []
+    
     for element in range(res.total):
         #print(res.docs[element])
         e = res.docs[element]
-        parser(e)
+        #print(e)
+        print("------------------------------------------------------------------------------")
+        #print(e.id)
+        
+        document_string = str(e)
+        json_string = document_string.replace('Document', '').replace('\'', '\"').replace('None', 'null')
+        
+        #prints string in double quotes("")
+        #print(json_string)
+        jsondata = json.loads(json_string)
+        #print(jsondata.last_name)
+        
+        #print(type(e.id))
+        
+        print(jsondata)
+        
+        jsonArray.append(jsondata)
+        #parser(e)
         #print(str(res.docs[element]).replace('Document ',''))
         #jsonvalues = json.dumps(str(res.docs[element]).replace('Document ','').replace('\'', '\"').replace('None', 'null'))
-        jsonObject[element]=json.dumps(str(res.docs[element]).replace('Document ','').replace('\'', '\"').replace('None', 'null'))
+        
+        #jsonObject[element]=json.dumps(str(res.docs[element]).replace('Document ','').replace('\'', '\"').replace('None', 'null'))
     #return json.dumps(res)
     #print(json.loads(jsonvalues))
-    return Response(json.loads(jsonObject), status=200, mimetype='application/json' )
+    
+    
+    #return Response(json.loads(jsonObject), status=200, mimetype='application/json' )
+    
+    # Final JSON Array 
+    #print(jsonArray)
+    returnObject = { 'response' : jsonArray }
+    print(returnObject)
+    returnObject = json.dumps(returnObject)
+    return Response(returnObject, status=200, mimetype='application/json' );
 
 def parser(e):
     print(e.first_name)
@@ -148,5 +182,5 @@ def page_not_found(e):
 if __name__ == '__main__':
     print('Starting service default port')
     #app.run(host='0.0.0.0', debug=False)
-    app.run(host='0.0.0.0') # default - with debugger (will not show the custom Error pages)
+    app.run(host='0.0.0.0') # default = with debugger (will not show the custom Error pages)
     
