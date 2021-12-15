@@ -8,6 +8,8 @@ from collections import namedtuple
 from redisearch import Client, TextField, NumericField, Query
 
 import json, redis
+import time
+
 
 
 NOT_AVAILABLE = 'API Not found'
@@ -34,6 +36,7 @@ app = Flask(__name__)
 ## This API is only for the first service to upsert the data
 @app.route('/insert', methods=['POST'])
 def insert():
+    #time.sleep(4) (for timeout testing)
     rawRequst = request.json
     id = rawRequst['id']
     status=""
@@ -61,8 +64,8 @@ def insert():
         connection.sadd(TOTAL_KEYS, id)
         
         return Response('Inserted Successfully', status=201, mimetype='application/json')
-    except redis.RedisError:
-        print('Exception occured')
+    except redis.RedisError as e:
+        print('Exception occured ' + str(e))
         return Response(SERVER_ERROR, status=500, mimetype='application/json')
 
 ## Updating the Status
@@ -80,8 +83,8 @@ def statusUpdate():
         error=rawRequst['error']
         updateStatus(status, id, service_name, error)
         return Response('Updated Successfully', status=200, mimetype='application/json')     
-    except ValueError:
-        print('Exception occurred during status update')
+    except ValueError as e:
+        print('Exception occurred during status update ' + str(e))
         return Response(SERVER_ERROR, status=500, mimetype='application/json')
     
 
@@ -117,8 +120,8 @@ def getAll():
         #returnObject = {'response': list(userSet)}
         returnObject = {'response': jsonArray}
         return Response(json.dumps(returnObject), status=200, mimetype='application/json')
-    except redis.RedisError:
-        print('Exception occurred during retrieval')
+    except redis.RedisError as e:
+        print('Exception occurred during retrieval ' + str(e))
         return Response(SERVER_ERROR, status=500, mimetype='application/json')
 
 
