@@ -4,6 +4,7 @@ from datetime import datetime
 from flask.wrappers import Response
 from types import SimpleNamespace
 from collections import namedtuple
+import logging
 
 from redisearch import Client, TextField, NumericField, Query
 
@@ -46,7 +47,7 @@ def insert():
         service_name = request.args.get('serviceName')
     
     except ValueError:
-        print(INVALID_ARGUMENTS)
+        app.logger.info(INVALID_ARGUMENTS)
         return Response(INVALID_ARGUMENTS, status=400, mimetype='application/json')
             
     #requestBody = json.dumps(rawRequst)
@@ -65,7 +66,7 @@ def insert():
         
         return Response('Inserted Successfully', status=201, mimetype='application/json')
     except redis.RedisError as e:
-        print('Exception occured ' + str(e))
+        app.logger.error('Exception occured ' + str(e))
         return Response(SERVER_ERROR, status=500, mimetype='application/json')
 
 ## Updating the Status
@@ -84,28 +85,30 @@ def statusUpdate():
         updateStatus(status, id, service_name, error)
         return Response('Updated Successfully', status=200, mimetype='application/json')     
     except ValueError as e:
-        print('Exception occurred during status update ' + str(e))
+        app.logger.error('Exception occurred during status update ' + str(e))
         return Response(SERVER_ERROR, status=500, mimetype='application/json')
     
 
 def updateStatus(status, id, service_name, error):
     
     if status == 'success':
+        app.logger.info('Received success response')
         key= SUCCESS_PREFIX + service_name
         connection.sadd(key, id)
     else:
+        app.logger.info('Received Failure response')
         key=FAILURE_PREFIX + service_name
-        print('Updating Failure records for key : ' + key)
+        app.logger.info('Updating Failure records for key : ' + str(key))
         connection.sadd(key, id)
         key=key +':' + str(id)
-        print('Recording Error message for key : ' + key)
+        app.logger.info('Recording Error message for key : ' + str(key))
         connection.set(key, error)
         
     
 # API will find the set of total users in the list, and will iterate through them to fetch the data for each one.
 @app.route('/get/all', methods=['GET'])
 def getAll():
-    print('Inside Get all Function', datetime.today())
+    app.logger.info('Inside Get all Function' + str(datetime.today()))
     jsonArray = []
     try:
         #map=connection.hgetall('user:*')
@@ -116,23 +119,24 @@ def getAll():
             #print(element)
             jsonArray.append(element)
         
-        print('Total result - ' + str(len(jsonArray)))
+        app.logger.info('Total result - ' + str(len(jsonArray)))
         #returnObject = {'response': list(userSet)}
         returnObject = {'response': jsonArray}
         return Response(json.dumps(returnObject), status=200, mimetype='application/json')
     except redis.RedisError as e:
-        print('Exception occurred during retrieval ' + str(e))
+        app.logger.error('Exception occurred during retrieval ' + str(e))
         return Response(SERVER_ERROR, status=500, mimetype='application/json')
 
 
     
 @app.route('/search', methods=['GET'])
 def search():
+    app.logger.info("Inside Search API")
     query=request.args.get('query')
-    print("Query = ", query)
+    app.logger.info("Search query : " + query)
     client = Client(SEARCH_INDEX)
     res = client.search(query)
-    print('Total elements in result = ', res.total)
+    app.logger.info('Total elements in result = ' + str(res.total))
     jsonArray = []
     
     for element in range(res.total):
@@ -156,7 +160,7 @@ def parser(doc):
 ## Health Check API
 @app.route('/health', methods=['GET'])
 def health():
-    print('Health Check @ ',  datetime.today())
+    app.logger.info('Health Check @ ' + str(datetime.today()))
     return Response('OK', status=200)
 
 ##### Custom Error Handling #####
@@ -172,7 +176,7 @@ def page_not_found(e):
 
 ## initiating the server
 if __name__ == '__main__':
-    print('Starting service default port')
+    app.logger.info('Starting service default port')
     #app.run(host='0.0.0.0', debug=False)
     app.run(host='0.0.0.0') # default = with debugger (will not show the custom Error pages)
     
