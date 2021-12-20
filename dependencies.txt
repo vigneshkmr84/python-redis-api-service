@@ -1,0 +1,3 @@
+redisearch
+redis
+flask
